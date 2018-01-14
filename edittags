@@ -1,0 +1,2 @@
+#!/bin/sh
+metaflac --export-tags-to=- "$1" | vipe | ifne metaflac --remove-all-tags --import-tags-from=- "$1"

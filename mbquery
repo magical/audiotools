@@ -1,0 +1,162 @@
+#!/usr/bin/python2
+
+# quicktag 'Artist' 'Album'
+# -> look up album on musicbrainz
+# -> present choices
+# -> get track names
+# -> present for editing
+# -> auto-rename
+
+from __future__ import division, print_function, unicode_literals
+
+import musicbrainzngs as mb
+import os
+import re
+import subprocess
+import sys
+
+#from pprint import pprint
+
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
+mb.set_useragent('quicktag', '0.1')
+
+ALLDISCS = u'(All discs)'
+
+def main():
+    if '-h' in sys.argv or '--help' in sys.argv:
+        print("Usage: quicktag \"Artist name\" \"Album title\"")
+        sys.exit(1)
+        
+    if len(sys.argv) < 3:
+        cwd = os.getcwd()
+        cwd, album = os.path.split(cwd)
+    else:
+        album = sys.argv[2]
+
+    if len(sys.argv) < 2:
+        cwd, artist = os.path.split(cwd)
+    else:
+        artist = sys.argv[1]
+
+    query = u'artist:"{}" "{}"'.format(artist, album)
+    releases = mb.search_releases(query)['release-list']
+    r = selecta(releases, format_release)
+    if not r:
+        sys.exit(0)
+
+    print(u'ALBUM={}'.format(r['title']))
+    print(u'ARTIST={}'.format(r['artist-credit-phrase']))
+
+    various = r['artist-credit-phrase'] == 'Various Artists'
+
+    r = mb.get_release_by_id(r['id'], includes=['recordings', 'media', 'release-groups', 'labels', 'artist-credits'])
+    r = r['release']
+
+    #r['medium-list'] = [x for x in r['medium-list'] if x]
+    if len(r['medium-list']) > 1:
+        disc = selecta([ALLDISCS] + r['medium-list'], format_medium)
+        if not disc:
+            sys.exit(1)
+
+        #pprint(r, stream=sys.stderr)
+    else:
+        disc = r['medium-list'][0]
+
+    release_date = r.get('date', u'')
+    original_date = r['release-group']['first-release-date']
+
+    if original_date and release_date and original_date != release_date:
+        print(u'DATE={}'.format(original_date))
+        print(u'RELEASEDATE={}'.format(release_date))
+    elif original_date:
+        print(u'DATE={}'.format(original_date))
+    elif release_date:
+        print(u'DATE={}'.format(release_date))
+    else:
+        print(u'DATE=')
+
+    if len(r['medium-list']) > 1:
+        if disc is not ALLDISCS:
+            print("DISCNUMBER=", disc['position'], sep="")
+        print("DISCTOTAL=", r['medium-count'], sep="")
+
+    print(u"#CATALOGNUMBER=")
+    print(u'#MUSICBRAINZ_RELEASE_ID={}'.format(r['id']))
+    print(u'#MUSICBRAINZ_RELEASE_GROUP_ID={}'.format(r['release-group']['id']))
+    print()
+
+    def print_disc(disc):
+        for track in disc['track-list']:
+            print(u"TITLE{}={}".format(track['number'].zfill(2), track['recording']['title']))
+            if various:
+                print(u"ARTIST{}={}".format(track['number'].zfill(2), track['artist-credit-phrase']))
+
+    if disc is ALLDISCS:
+        for disc in r['medium-list']:
+            print_disc(disc)
+            print()
+    else:
+        print_disc(disc)
+
+    print()
+    print("# vim: syntax=plain")
+    
+    sys.exit(0)
+
+def selecta(choices, formatter):
+    if not choices:
+        return
+    proc = subprocess.Popen(['selecta'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    lines = []
+    for i, x in enumerate(choices):
+        lines.append(u"{} {}".format(i+1, formatter(x)).replace(u"\n", u" "))
+    input = "\n".join(lines).encode('utf-8')
+    try:
+        output, _ = proc.communicate(input)
+    except KeyboardInterrupt:
+        return
+    if proc.returncode != 0:
+        return
+    num = int(output.split(" ", 1)[0].decode())
+    return choices[num - 1]
+
+def format_release(r):
+    artist = r.get('artist-credit-phrase')
+    date = r.get('date', u'????-??-??')
+    title = r.get('title', '<Unknown>')
+    trackcount = r.get('track-count', '')
+    tracks = u"+".join(str(m['track-count']) for m in r['medium-list'] if m)
+    formats = u", ".join(m['format'] for m in r['medium-list'] if 'format' in m)
+    country = r.get('country')
+    barcode = r.get('barcode')
+    #pprint(r)
+    s = u"{} {} - {} [{}] ({})".format(date, artist, title, tracks, formats)
+    if country:
+        s += " (" + country + ")"
+    if barcode:
+        s += " (" + barcode + ")"
+    return s
+
+def format_medium(m):
+    if type(m) is unicode:
+        return m
+    s = "{} tracks".format(m.get('track-count', u'??'))
+    if 'format' in m:
+        s = m['format'] + ', ' + s
+    if 'title' in m:
+        s = m['title'] + ', ' + s
+    return s
+
+def ms(n):
+    if not n:
+        return ""
+    n = int(n)
+    m = n // 60000
+    s = n % 60000 / 1000
+    s = int(round(s))
+    return u"{}:{:02d}".format(m, s)
+
+if __name__ == '__main__':
+    main()

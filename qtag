@@ -1,0 +1,81 @@
+#!/usr/bin/python2
+import optparse
+import subprocess
+import sys
+import os
+
+this_dir = os.path.dirname(__file__)
+
+def save_tags(filename, tags, delete_all=False):
+    if filename.endswith('.flac'):
+        cmd = [ "metaflac" ]
+        if delete_all:
+            cmd.append("--remove-all-tags")
+        for k, v in tags:
+            cmd.append("--set-tag" + "=" + k.encode('utf-8') + '=' + v.encode('utf-8'))
+        cmd.append(filename)
+    elif filename.endswith('.dts') or filename.endswith('.ac3'):
+        cmd = [ "python2", os.path.join(this_dir, "ape.py") ]
+        for k, v in tags:
+            cmd.append("--tag" + "=" + k.encode('utf-8') + '=' + v.encode('utf-8'))
+        cmd.append(filename)
+    #print(cmd)
+    subprocess.check_call(cmd)
+
+def main():
+    parser = optparse.OptionParser()
+    parser.add_option("-d", dest="delete_all", action="store_true", default=False,
+                      help="delete all tags")
+
+    opts, filenames = parser.parse_args()
+
+    if not filenames:
+        print("Usage: qtag <tags files...")
+        sys.exit(1)
+
+    tags = []
+    titles = {}
+    artists = {}
+    for lineno, line in enumerate(sys.stdin):
+        line = line.decode('utf-8').strip()
+        if not line:
+            continue
+
+        if line.startswith('#'):
+            continue
+
+        if '=' not in line:
+            print("{}: invalid syntax".format(lineno+1))
+            sys.exit(1)
+
+        k, _, v = line.partition('=')
+        if not k:
+            print("{}: invalid syntax".format(lineno+1))
+            sys.exit(1)
+            
+        if k.startswith("TITLE") and k[5:].isdigit():
+            titles[int(k[5:])] = v
+        elif k.startswith("ARTIST") and k[6:].isdigit():
+            artists[int(k[6:])] = v
+        else:
+            if v:
+                tags.append((k, v))
+
+    #print(tags)
+    #print(titles)
+    
+    for i, filename in enumerate(filenames):
+        num = i+1
+        mytags = list(tags)
+        mytags.append((u"TRACKNUMBER", unicode(num)))
+        mytags.append((u"TRACKTOTAL", unicode(len(filenames))))
+        if num in titles:
+            mytags.append((u"TITLE", titles[num]))
+        if num in artists:
+            mytags.append((u"ARTIST", artists[num]))
+        save_tags(filename, mytags, delete_all=opts.delete_all)
+    
+    sys.exit(0)
+
+if __name__ == '__main__':
+    main()
