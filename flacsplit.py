@@ -1,4 +1,5 @@
 import sys
+import argparse
 
 """this script splits a dts file into separate tracks based on
 blu-ray chapter markings.
@@ -17,14 +18,15 @@ TICK_HZ = 45000.0 # samples / second
 TICK_START = 27000000 # ticks
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-r", "--rate", default=FLAC_HZ, type=int, help="flac sample rate")
+    parser.add_argument("-s", "--start", default=TICK_START, type=int, help="start ticks")
+    parser.add_argument("chapfile", nargs="?", default="-")
+    args = parser.parse_args()
+
     ticklist = []
-
-    chapfile = "-"
-    if len(sys.argv) > 2:
-        chapfile = sys.argv[1]
-
-    if chapfile and chapfile != '-':
-        with open(chapfile) as f:
+    if args.chapfile and args.chapfile != '-':
+        with open(args.chapfile) as f:
             for line in f:
                 tick = int(line.strip())
                 ticklist.append(tick)
@@ -33,15 +35,18 @@ def main():
             tick = int(line.strip())
             ticklist.append(tick)
 
-    assert ticklist[0] == TICK_START
+    tick_start = args.start
+    flac_hz = args.rate
+
+    assert ticklist[0] == tick_start
     del ticklist[0]
 
     sizelist = []
 
     prev = 0
     for tick in ticklist:
-        tick = tick - TICK_START
-        current = int(round(tick * (FLAC_HZ / TICK_HZ)))
+        tick = tick - tick_start
+        current = int(round(tick * (flac_hz / TICK_HZ)))
         samples = (current - prev)
         prev = current
         sizelist.append(samples)
