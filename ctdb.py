@@ -24,7 +24,7 @@ def main():
 
     info = lookup_toc(toc)
     if not info:
-        print("album not found")
+        print("album not in database")
         sys.exit(1)
 
     os.environ['PATH'] += os.pathsep + os.path.dirname(__file__)
@@ -37,7 +37,19 @@ def main():
     p2.wait()
     p1.wait()
 
-    print(out)
+    # TODO: note highest confidence entry
+
+    matches = 0
+    for line in out.decode().splitlines():
+        offset, c = line.split()
+        for entry in info:
+            if entry.crc32 == c or int(entry.crc32, 16) == int(c, 16):
+                print(f"Found match at offset {offset} with confidence {entry.confidence} and CRC {entry.crc32}")
+                matches += 1
+
+    if not matches:
+        print(f"No matches found")
+        sys.exit(1)
 
 def get_toc(tracks):
 
