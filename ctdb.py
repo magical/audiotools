@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 import sys
+import os
 import argparse
 import subprocess
+import sqlite3
+import zlib
 from collections import namedtuple
 
 import mutagen.flac
 import requests
 from xml.etree import ElementTree
+
+CTDBEntry = namedtuple("CTDBEntry", "confidence, crc32, stride, trackcrcs")
 
 def main():
     parser = argparse.ArgumentParser()
@@ -34,7 +39,6 @@ def main():
 
     print(out)
 
-
 def get_toc(tracks):
 
     toc = []
@@ -52,26 +56,98 @@ def get_toc(tracks):
 
     return toc
 
-
-CTDBEntry = namedtuple("CTDBEntry", "confidence, crc32, stride, trackcrcs")
-
 def lookup_toc(toc):
+    tocstr = ':'.join(str(x) for x in toc)
+
+    add_to_cache = False
+    content = lookup_from_cache(tocstr)
+    if content == None:
+        add_to_cache = True
+        content = lookup_from_web(tocstr)
+        if not content:
+            return None
+
+    info = parse_ctdb_xml(content)
+
+    if info and add_to_cache:
+        save_to_cache(tocstr, content)
+
+    return info
+
+db = None
+def open_db():
+    global db
+    if db != None:
+        return db
+
+    cachedir = os.environ.get("XDG_CACHE_HOME")
+    if not cachedir:
+        cachedir = os.path.expanduser("~/.cache")
+    cachedir  = os.path.join(cachedir, "ctdb")
+    try:
+        os.mkdir(cachedir)
+    except FileExistsError:
+        pass
+
+    dbfile = os.path.join(cachedir, "ctdb.sqlite")
+    db = sqlite3.connect(dbfile)
+    ver, = db.execute("PRAGMA user_version;").fetchone()
+
+    if ver < 1:
+        db.executescript("""
+            BEGIN;
+            CREATE TABLE IF NOT EXISTS ctdb (
+                toc TEXT,
+                content BLOB,
+                mtime TIMESTAMP DEFAULT current_timestamp
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ctdb_index ON ctdb (toc);
+            PRAGMA user_version = 1;
+            COMMIT;
+        """).close()
+
+    return db
+
+def lookup_from_cache(tocstr):
+    db = open_db()
+    cur = db.execute("SELECT content FROM ctdb WHERE toc = ?", (tocstr,))
+    row = cur.fetchone()
+    cur.close()
+    if row == None:
+        return None
+    else:
+        print("found in cache", file=sys.stderr)
+        return zlib.decompress(row[0])
+
+def save_to_cache(tocstr, content):
+    db = open_db()
+    with db:
+        db.execute(
+            "INSERT INTO ctdb(toc, content) VALUES (:1, :2)" +
+            "ON CONFLICT(toc) DO UPDATE SET content = :2, mtime = current_timestamp",
+            (tocstr, zlib.compress(content))).close()
+
+def lookup_from_web(tocstr):
+    print("fetching from web", file=sys.stderr)
     url = 'http://db.cuetools.net/lookup2.php'
     params = {
         'version': '3',
         'ctdb': '1',
         'metadata': 'fast', # fast, default, or extensive
         'fuzzy': '1',
-        'toc': ':'.join(map(str, toc)),
+        'toc': tocstr,
     }
 
     resp = requests.get(url, params)
     resp.raise_for_status()
 
+    return resp.content
+
+def parse_ctdb_xml(content):
     ns = {'Z': 'http://db.cuetools.net/ns/mmd-1.0#'}
 
-    root = ElementTree.fromstring(resp.content)
-    assert root.tag == '{http://db.cuetools.net/ns/mmd-1.0#}ctdb', root.tag
+    root = ElementTree.fromstring(content)
+    assert root.tag == '{'+ns['Z']+'}ctdb', root.tag
 
     crcinfo = []
     for entry in root.iterfind('Z:entry', ns):
