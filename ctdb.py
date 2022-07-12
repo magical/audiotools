@@ -15,12 +15,14 @@ CTDBEntry = namedtuple("CTDBEntry", "confidence, crc32, stride, trackcrcs")
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--pregap", type=int, help="pregap frames")
     parser.add_argument("files", nargs="+")
     args = parser.parse_args()
 
     toc = get_toc(args.files)
 
-    print(f"toc={toc}")
+    if args.pregap:
+        toc[0] = args.pregap
 
     info = lookup_toc(toc)
     if not info:
@@ -28,8 +30,11 @@ def main():
         sys.exit(1)
 
     os.environ['PATH'] += os.pathsep + os.path.dirname(__file__)
-    p1 = subprocess.Popen(["sox", "--no-clobber"] + args.files + ["-t", "s16", "-"], stdout=subprocess.PIPE, stdin=subprocess.DEVNULL)
-    p2 = subprocess.Popen(["ctdb_crc32"] + [entry.crc32 for entry in info], stdin=p1.stdout, stdout=subprocess.PIPE)
+    effects = []
+    if args.pregap:
+        effects += ["trim", str(args.pregap*588)+"s"]
+    p1 = subprocess.Popen(["sox", "--no-clobber"] + args.files + ["-t", "s16", "-"] + effects, stdout=subprocess.PIPE, stdin=subprocess.DEVNULL)
+    p2 = subprocess.Popen(["ctdb_crc32"] + [entry.crc32 for entry in info], stdin=p1.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
     p1.stdout.close()
     out = p2.stdout.read()
@@ -70,6 +75,8 @@ def get_toc(tracks):
 
 def lookup_toc(toc):
     tocstr = ':'.join(str(x) for x in toc)
+
+    print(f"info: toc={tocstr}", file=sys.stderr)
 
     add_to_cache = False
     content = lookup_from_cache(tocstr)
@@ -128,7 +135,7 @@ def lookup_from_cache(tocstr):
     if row == None:
         return None
     else:
-        print("found in cache", file=sys.stderr)
+        print("info: found in cache", file=sys.stderr)
         return zlib.decompress(row[0])
 
 def save_to_cache(tocstr, content):
@@ -140,7 +147,7 @@ def save_to_cache(tocstr, content):
             (tocstr, zlib.compress(content))).close()
 
 def lookup_from_web(tocstr):
-    print("fetching from web", file=sys.stderr)
+    print("info: fetching from web", file=sys.stderr)
     url = 'http://db.cuetools.net/lookup2.php'
     params = {
         'version': '3',
