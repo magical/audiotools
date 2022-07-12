@@ -134,9 +134,8 @@ def lookup_from_cache(tocstr):
     cur.close()
     if row == None:
         return None
-    else:
-        print("info: found in cache", file=sys.stderr)
-        return zlib.decompress(row[0])
+    print("info: found in cache", file=sys.stderr)
+    return zlib.decompress(row[0])
 
 def save_to_cache(tocstr, content):
     db = open_db()
@@ -158,6 +157,8 @@ def lookup_from_web(tocstr):
     }
 
     resp = requests.get(url, params)
+    if resp.status_code == 404:
+        return None
     resp.raise_for_status()
 
     return resp.content
