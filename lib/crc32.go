@@ -11,7 +11,6 @@ type RollingCRC struct {
 	crc   uint32 // *unmasked* CRC of the window (no 0xfffffff prefix and not inverted)
 	zero  uint32 // CRC of length 0x00 bytes, including the 0xfffffff prefix
 	one   uint32 // CRC of 0x80 followed by length-1 0x00 bytes, with no 0xfffffff prefix
-	z     []byte // slice of 0x00 bytes
 	table *crc32.Table
 }
 
@@ -56,18 +55,18 @@ func (d *RollingCRC) Update(old, new []byte) {
 		c = ^crc32.Update(^c, d.table, new[len(old):]) // unmasked update
 		// increase zero and one to match
 		n := len(new) - len(old)
-		z := d.z
-		if cap(z) < n {
-			z = make([]byte, n)
-			d.z = z
-		}
-		z = z[:n]
+		z := make([]byte, n)
 		if d.size == 0 {
 			z = z[1:] //compensate for the initial byte in each crc
 		}
 		d.zero = crc32.Update(d.zero, d.table, z)
 		d.one = crc32.Update(d.one, d.table, z)
 		d.size += n
+		// we could hold onto z for later but increasing the length
+		// is uncommon, and stashing it on d would force it to be heap
+		// allocated.
+		// maybe a sync.Pool would be appropriate if the allocation
+		// proves to be a problem.
 	}
 	d.crc = c
 }

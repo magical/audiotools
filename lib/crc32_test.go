@@ -6,10 +6,6 @@ import (
 	"testing"
 )
 
-func hex(v uint32) string {
-	return fmt.Sprintf("%08x", v)
-}
-
 func crcmul(crc uint32, val uint8) uint32 {
 	return crcmulTable(crc, val, crc32.IEEETable)
 }
