@@ -7,7 +7,7 @@ import (
 )
 
 func crcmul(crc uint32, val uint8) uint32 {
-	return crcmulTable(crc, val, crc32.IEEETable)
+	return ^crcmulUnmasked(^crc, val, crc32.IEEETable)
 }
 
 func TestCrcmul(t *testing.T) {

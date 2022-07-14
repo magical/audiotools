@@ -3,14 +3,13 @@ package lib
 import (
 	"fmt"
 	"hash/crc32"
-	"math/bits"
 )
 
 type RollingCRC struct {
 	size  int    // size of the CRC window
 	crc   uint32 // *unmasked* CRC of the window (no 0xfffffff prefix and not inverted)
 	zero  uint32 // CRC of length 0x00 bytes, including the 0xfffffff prefix
-	one   uint32 // CRC of 0x80 followed by length-1 0x00 bytes, with no 0xfffffff prefix
+	one   uint32 // *unmasked* CRC of 0x80 followed by length-1 0x00 bytes
 	table *crc32.Table
 }
 
@@ -25,7 +24,7 @@ var zeroByte = []byte{0}
 func (d *RollingCRC) Reset() {
 	d.crc = 0
 	d.zero = crc32.Checksum(zeroByte, d.table)
-	d.one = ^d.table[0x80] // == d.zero ^ crc32.Checksum([]byte{0x80}, d.table)
+	d.one = d.table[0x80] // == d.zero ^ crc32.Checksum([]byte{0x80}, d.table)
 }
 
 // update rolls the CRC forwards, subtracting old bytes from the left
@@ -47,7 +46,7 @@ func (d *RollingCRC) Update(old, new []byte) {
 	if d.size > 0 {
 		for i := range old {
 			// subtract the old byte
-			c ^= ^crcmulTable(d.one, old[i], d.table)
+			c ^= crcmulUnmasked(d.one, old[i], d.table)
 			// add the new byte
 			//c = ^crc32.Update(^c, d.table, new[i:i+1]) // unmasked update
 			c = d.table[byte(c)^new[i]] ^ (c >> 8) // unmasked update
@@ -65,7 +64,7 @@ func (d *RollingCRC) Update(old, new []byte) {
 			z = z[1:] //compensate for the initial byte in each crc
 		}
 		d.zero = crc32.Update(d.zero, d.table, z)
-		d.one = crc32.Update(d.one, d.table, z)
+		d.one = ^crc32.Update(^d.one, d.table, z) // unmasked update
 		d.size += n
 		// we could hold onto z for later but increasing the length
 		// is uncommon, and stashing it on d would force it to be heap
@@ -80,15 +79,14 @@ func (d *RollingCRC) Sum32() uint32 {
 	return d.crc ^ d.zero
 }
 
-/// multiplies a 32-bit CRC by a 8-bit value
-func crcmulTable(crc uint32, val uint8, t *crc32.Table) uint32 {
-	c := uint64(bits.Reverse32(^crc))
-	a := uint64(bits.Reverse8(val))
-	// multiply
+// multiplies an unmasked 32-bit CRC by a 8-bit polynomial
+func crcmulUnmasked(crc uint32, val uint8, t *crc32.Table) uint32 {
+	c := uint64(crc) << 1
+	a := uint64(val)
 	m := c*(a&0x80) ^ c*(a&0x40) ^ c*(a&0x20) ^ c*(a&0x10) ^
 		c*(a&8) ^ c*(a&4) ^ c*(a&2) ^ c*(a&1)
-	m = bits.Reverse64(m)
+
 	// reduce
-	crc = uint32(m>>32) ^ t[byte(m>>24)]
-	return ^crc
+	crc = uint32(m>>8) ^ t[byte(m)]
+	return crc
 }
