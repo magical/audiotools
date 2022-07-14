@@ -20,10 +20,12 @@ func NewRollingCRC(table *crc32.Table) *RollingCRC {
 	return r
 }
 
+var zeroByte = []byte{0}
+
 func (d *RollingCRC) Reset() {
 	d.crc = 0
-	d.zero = crc32.Checksum([]byte{0}, d.table)
-	d.one = crc32.Update(^uint32(0), d.table, []byte{0x80}) // ^uint32(0) cancels out the prefix
+	d.zero = crc32.Checksum(zeroByte, d.table)
+	d.one = ^d.table[0x80] // == d.zero ^ crc32.Checksum([]byte{0x80}, d.table)
 }
 
 // update rolls the CRC forwards, subtracting old bytes from the left
@@ -37,6 +39,9 @@ func (d *RollingCRC) Update(old, new []byte) {
 	if len(old) > d.size {
 		// TODO: can we do something clever here?
 		panic(fmt.Errorf("rolling update: tried to shift %d bytes out of a %d-size window", len(old), d.size))
+	}
+	if len(old) > len(new) {
+		panic(fmt.Errorf("rolling update: cannot decrease window size, old > new [%d > %d]", len(old), len(new)))
 	}
 	c := d.crc
 	if d.size > 0 {
