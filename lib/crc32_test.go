@@ -103,7 +103,7 @@ func TestRollingCRC(t *testing.T) {
 
 	w := 32
 	for _, stride := range []int{1, 4} {
-		*d = *NewRollingCRC(tab)
+		d.Reset()
 		for i := 0; i < len(data)-w; i += stride {
 			if i == 0 {
 				d.Update(nil, data[:w])
