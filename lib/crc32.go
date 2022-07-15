@@ -6,10 +6,16 @@ import (
 )
 
 type RollingCRC struct {
-	size  int    // size of the CRC window
-	crc   uint32 // *unmasked* CRC of the window (no 0xfffffff prefix and not inverted)
-	zero  uint32 // CRC of length 0x00 bytes, including the 0xfffffff prefix
-	one   uint32 // *unmasked* CRC of 0x80 followed by length-1 0x00 bytes
+	size int    // size of the CRC window
+	crc  uint32 // *unmasked* CRC of the window (no 0xfffffff prefix and not inverted)
+	zero uint32 // CRC of length 0x00 bytes, including the 0xfffffff prefix
+	// *unmasked* CRC of 0x80 followed by length-1 0x00 bytes
+	// represents the polynomial x^(32+length*8)
+	one uint32
+	// inverted CRC of 1 followed by xlen*8 zeros
+	// represents the polynomial x^(xlen*8)
+	x     uint32
+	xlen  int
 	table *crc32.Table
 }
 
@@ -57,20 +63,36 @@ func (d *RollingCRC) Update(old, new []byte) {
 	if len(old) < len(new) {
 		// add the new bytes
 		c = ^crc32.Update(^c, d.table, new[len(old):]) // unmasked update
+
 		// increase zero and one to match
+		// we could update them separately by appending zero bytes,
+		// like so
+		//     z := make([]byte, n)
+		//     zero = crc32.Update(zero, d.table, z)
+		//     one = ^crc32.Update(^one, d.table, z)
+		// but this is somewhat expensive.
+		// instead we do one update operation to get a large power of x modulo
+		// the CRC polynomial and multiply d.zero and d.one by it.
+		//
+		// we also cache the value so that if the caller does multiple updates
+		// with the same buffer size we don't have keep redoing the CRC update
+		// (and allocating a new buffer).
 		n := len(new) - len(old)
-		z := make([]byte, n)
 		if d.size == 0 {
-			z = z[1:] //compensate for the initial byte in each crc
+			n-- // compensate for the initial byte in each crc
 		}
-		d.zero = crc32.Update(d.zero, d.table, z)
-		d.one = ^crc32.Update(^d.one, d.table, z) // unmasked update
-		d.size += n
-		// we could hold onto z for later but increasing the length
-		// is uncommon, and stashing it on d would force it to be heap
-		// allocated.
-		// maybe a sync.Pool would be appropriate if the allocation
-		// proves to be a problem.
+		if d.xlen == 0 || d.xlen > n {
+			d.x = 1 << 31
+			d.xlen = 0
+		}
+		if d.xlen < n {
+			z := make([]byte, n-d.xlen)
+			d.x = ^crc32.Update(^d.x, d.table, z)
+			d.xlen += len(z)
+		}
+		d.one = crcmul32(d.one, d.x, d.table)
+		d.zero = ^crcmul32(^d.zero, d.x, d.table)
+		d.size += d.xlen
 	}
 	d.crc = c
 }
@@ -89,4 +111,18 @@ func crcmulUnmasked(crc uint32, val uint8, t *crc32.Table) uint32 {
 	// reduce
 	crc = uint32(m>>8) ^ t[byte(m)]
 	return crc
+}
+
+func crcmul32(crc, crc2 uint32, t *crc32.Table) uint32 {
+	c := uint64(0)
+
+	c ^= uint64(crcmulUnmasked(crc, byte(crc2), t)) << 0
+	c ^= uint64(crcmulUnmasked(crc, byte(crc2>>8), t)) << 8
+	c ^= uint64(crcmulUnmasked(crc, byte(crc2>>16), t)) << 16
+	c ^= uint64(crcmulUnmasked(crc, byte(crc2>>24), t)) << 24
+
+	c = (c >> 8) ^ uint64(t[byte(c)])
+	c = (c >> 8) ^ uint64(t[byte(c)])
+	c = (c >> 8) ^ uint64(t[byte(c)])
+	return uint32(c)
 }

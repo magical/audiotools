@@ -149,3 +149,21 @@ func BenchmarkRollingCRC(b *testing.B) {
 		})
 	}
 }
+
+func TestMul32(t *testing.T) {
+	tab := crc32.IEEETable
+	for _, tt := range []struct {
+		a, b, want uint32
+	}{
+		{0x8000, 0x8000, crc32.IEEE},
+		{1 << 31, 0xffffffff, 0xffffffff},
+		{0xffffffff, 1 << 31, 0xffffffff},
+		{0x80, ^crc32.ChecksumIEEE([]byte{1, 2, 3, 4}), ^crc32.ChecksumIEEE([]byte{1, 2, 3, 4, 0, 0, 0})},
+		{crc32.IEEE, 0xffffffff, ^crc32.ChecksumIEEE([]byte{0, 0, 0, 0})},
+	} {
+		got := crcmul32(tt.a, tt.b, tab)
+		if got != tt.want {
+			t.Errorf("mul(%08x, %08x) = %08x, want %08x", tt.a, tt.b, got, tt.want)
+		}
+	}
+}
