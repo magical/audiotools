@@ -25,12 +25,10 @@ func NewRollingCRC(table *crc32.Table) *RollingCRC {
 	return r
 }
 
-var zeroByte = []byte{0}
-
 func (d *RollingCRC) Reset() {
 	d.crc = 0
-	d.zero = crc32.Checksum(zeroByte, d.table)
-	d.one = d.table[0x80] // == d.zero ^ crc32.Checksum([]byte{0x80}, d.table)
+	d.zero = 0
+	d.one = 0x80
 }
 
 // update rolls the CRC forwards, subtracting old bytes from the left
@@ -69,6 +67,7 @@ func (d *RollingCRC) Update(old, new []byte) {
 func (d *RollingCRC) extend(buf []byte) {
 	// add the new bytes
 	d.crc = ^crc32.Update(^d.crc, d.table, buf) // unmasked update
+	d.size += len(buf)
 
 	// increase zero and one to match
 	// we could update them separately by appending zero bytes,
@@ -83,22 +82,17 @@ func (d *RollingCRC) extend(buf []byte) {
 	// we also cache the value so that if the caller does multiple updates
 	// with the same buffer size we don't have keep redoing the CRC update
 	// (and allocating a new buffer).
-	n := len(buf)
-	if d.size == 0 {
-		n-- // compensate for the initial byte in each crc
-	}
-	if d.xlen == 0 || d.xlen > n {
+	if d.xlen == 0 || d.xlen > len(buf) {
 		d.x = 1 << 31
 		d.xlen = 0
 	}
-	if d.xlen < n {
-		z := make([]byte, n-d.xlen)
+	if d.xlen < len(buf) {
+		z := make([]byte, len(buf)-d.xlen)
 		d.x = ^crc32.Update(^d.x, d.table, z)
 		d.xlen += len(z)
 	}
-	d.one = crcmul32(d.one, d.x, d.table)
 	d.zero = ^crcmul32(^d.zero, d.x, d.table)
-	d.size += len(buf)
+	d.one = crcmul32(d.one, d.x, d.table)
 }
 
 func (d *RollingCRC) Sum32() uint32 {
