@@ -48,8 +48,8 @@ func (d *RollingCRC) Update(old, new []byte) {
 	if len(old) > len(new) {
 		panic(fmt.Errorf("rolling update: cannot decrease window size, old > new [%d > %d]", len(old), len(new)))
 	}
-	c := d.crc
 	if d.size > 0 {
+		c := d.crc
 		for i := range old {
 			// subtract the old byte
 			c ^= crcmulUnmasked(d.one, old[i], d.table)
@@ -57,44 +57,48 @@ func (d *RollingCRC) Update(old, new []byte) {
 			//c = ^crc32.Update(^c, d.table, new[i:i+1]) // unmasked update
 			c = d.table[byte(c)^new[i]] ^ (c >> 8) // unmasked update
 		}
+		d.crc = c
 	}
 
 	// increase the size of the window
 	if len(old) < len(new) {
-		// add the new bytes
-		c = ^crc32.Update(^c, d.table, new[len(old):]) // unmasked update
-
-		// increase zero and one to match
-		// we could update them separately by appending zero bytes,
-		// like so
-		//     z := make([]byte, n)
-		//     zero = crc32.Update(zero, d.table, z)
-		//     one = ^crc32.Update(^one, d.table, z)
-		// but this is somewhat expensive.
-		// instead we do one update operation to get a large power of x modulo
-		// the CRC polynomial and multiply d.zero and d.one by it.
-		//
-		// we also cache the value so that if the caller does multiple updates
-		// with the same buffer size we don't have keep redoing the CRC update
-		// (and allocating a new buffer).
-		n := len(new) - len(old)
-		if d.size == 0 {
-			n-- // compensate for the initial byte in each crc
-		}
-		if d.xlen == 0 || d.xlen > n {
-			d.x = 1 << 31
-			d.xlen = 0
-		}
-		if d.xlen < n {
-			z := make([]byte, n-d.xlen)
-			d.x = ^crc32.Update(^d.x, d.table, z)
-			d.xlen += len(z)
-		}
-		d.one = crcmul32(d.one, d.x, d.table)
-		d.zero = ^crcmul32(^d.zero, d.x, d.table)
-		d.size += d.xlen
+		d.extend(new[len(old):])
 	}
-	d.crc = c
+}
+
+func (d *RollingCRC) extend(buf []byte) {
+	// add the new bytes
+	d.crc = ^crc32.Update(^d.crc, d.table, buf) // unmasked update
+
+	// increase zero and one to match
+	// we could update them separately by appending zero bytes,
+	// like so
+	//     z := make([]byte, n)
+	//     zero = crc32.Update(zero, d.table, z)
+	//     one = ^crc32.Update(^one, d.table, z)
+	// but this is somewhat expensive.
+	// instead we do one update operation to get a large power of x modulo
+	// the CRC polynomial and multiply d.zero and d.one by it.
+	//
+	// we also cache the value so that if the caller does multiple updates
+	// with the same buffer size we don't have keep redoing the CRC update
+	// (and allocating a new buffer).
+	n := len(buf)
+	if d.size == 0 {
+		n-- // compensate for the initial byte in each crc
+	}
+	if d.xlen == 0 || d.xlen > n {
+		d.x = 1 << 31
+		d.xlen = 0
+	}
+	if d.xlen < n {
+		z := make([]byte, n-d.xlen)
+		d.x = ^crc32.Update(^d.x, d.table, z)
+		d.xlen += len(z)
+	}
+	d.one = crcmul32(d.one, d.x, d.table)
+	d.zero = ^crcmul32(^d.zero, d.x, d.table)
+	d.size += len(buf)
 }
 
 func (d *RollingCRC) Sum32() uint32 {
