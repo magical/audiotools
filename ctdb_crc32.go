@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"runtime/pprof"
 	"strconv"
 
 	"github.com/magical/audiotools/lib"
@@ -39,6 +40,14 @@ func main() {
 	}
 
 	input := os.Stdin
+
+	const doProfile = false
+	if doProfile {
+		cpufile, _ := os.Create("/tmp/ctdb_cpu.prof")
+		defer cpufile.Close()
+		pprof.StartCPUProfile(cpufile)
+		defer pprof.StopCPUProfile()
+	}
 
 	// we want to keep a circular buffer of 30*588 samples
 	// we need at least 20 to detect the end
