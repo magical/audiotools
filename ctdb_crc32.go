@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"hash/crc32"
 	"io"
 	"log"
 	"os"
@@ -70,7 +69,7 @@ func main() {
 	leadinBuf := make([]byte, len(buffer))
 	copy(leadinBuf, buffer)
 
-	r := lib.NewRollingCRC(crc32.IEEETable)
+	r := lib.NewRollingCRC(nil)
 
 	// if we hit EOF, we're done reading and can proceed to the rolling calculation
 	// if not then we have more data to read

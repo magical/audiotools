@@ -12,14 +12,16 @@ type RollingCRC struct {
 	// *unmasked* CRC of 0x80 followed by length-1 0x00 bytes
 	// represents the polynomial x^(32+length*8)
 	one uint32
-	// inverted CRC of 1 followed by xlen*8 zeros
-	// represents the polynomial x^(xlen*8)
+	// unmasked CRC which represents the polynomial x^(xlen*8)
 	x     uint32
 	xlen  int
 	table *crc32.Table
 }
 
 func NewRollingCRC(table *crc32.Table) *RollingCRC {
+	if table == nil {
+		table = crc32.IEEETable
+	}
 	r := &RollingCRC{table: table}
 	r.Reset()
 	return r
@@ -112,9 +114,7 @@ func crcmulUnmasked(crc uint32, val uint8, t *crc32.Table) uint32 {
 }
 
 func crcmul32(crc, crc2 uint32, t *crc32.Table) uint32 {
-	c := uint64(0)
-
-	c ^= uint64(crcmulUnmasked(crc, byte(crc2), t)) << 0
+	c := uint64(crcmulUnmasked(crc, byte(crc2), t)) << 0
 	c ^= uint64(crcmulUnmasked(crc, byte(crc2>>8), t)) << 8
 	c ^= uint64(crcmulUnmasked(crc, byte(crc2>>16), t)) << 16
 	c ^= uint64(crcmulUnmasked(crc, byte(crc2>>24), t)) << 24
