@@ -6,7 +6,7 @@ import (
 )
 
 type RollingCRC struct {
-	size int    // size of the CRC window
+	size int64  // size of the CRC window
 	crc  uint32 // *unmasked* CRC of the window (no 0xfffffff prefix and not inverted)
 	zero uint32 // CRC of length 0x00 bytes, including the 0xfffffff prefix
 	// *unmasked* CRC of 0x80 followed by length-1 0x00 bytes
@@ -39,7 +39,7 @@ func (d *RollingCRC) Reset() {
 // the old bytes must be exactly the bytes that were added d.Size bytes ago,
 // or else the result is undefined.
 func (d *RollingCRC) Update(old, new []byte) {
-	if len(old) > d.size {
+	if int64(len(old)) > d.size {
 		// TODO: can we do something clever here?
 		panic(fmt.Errorf("rolling update: tried to shift %d bytes out of a %d-size window", len(old), d.size))
 	}
@@ -67,7 +67,7 @@ func (d *RollingCRC) Update(old, new []byte) {
 func (d *RollingCRC) extend(buf []byte) {
 	// add the new bytes
 	d.crc = ^crc32.Update(^d.crc, d.table, buf) // unmasked update
-	d.size += len(buf)
+	d.size += int64(len(buf))
 
 	// increase zero and one to match
 	// we could update them separately by appending zero bytes,
