@@ -9,7 +9,7 @@ type RollingCRC struct {
 	size int64  // size of the CRC window
 	crc  uint32 // *unmasked* CRC of the window (no 0xfffffff prefix and not inverted)
 	zero uint32 // CRC of length 0x00 bytes, including the 0xfffffff prefix
-	// *unmasked* CRC of 0x80 followed by length-1 0x00 bytes
+	// *unmasked* CRC of 0x80 followed by length 0x00 bytes
 	// represents the polynomial x^(32+length*8)
 	one uint32
 	// unmasked CRC which represents the polynomial x^(xlen*8)
@@ -30,7 +30,7 @@ func NewRollingCRC(table *crc32.Table) *RollingCRC {
 func (d *RollingCRC) Reset() {
 	d.crc = 0
 	d.zero = 0
-	d.one = 0x80
+	d.one = d.table[0x80]
 }
 
 // update rolls the CRC forwards, subtracting old bytes from the left
@@ -51,11 +51,11 @@ func (d *RollingCRC) Update(old, new []byte) {
 	if d.size > 0 {
 		c := d.crc
 		for i := range old {
-			// subtract the old byte
-			c ^= crcmulUnmasked(d.one, old[i], d.table)
 			// add the new byte
 			//c = ^crc32.Update(^c, d.table, new[i:i+1]) // unmasked update
 			c = d.table[byte(c)^new[i]] ^ (c >> 8) // unmasked update
+			// subtract the old byte
+			c ^= crcmulUnmasked(d.one, old[i], d.table)
 		}
 		d.crc = c
 	}
