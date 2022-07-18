@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python3
 import optparse
 import subprocess
 import sys
@@ -9,15 +9,16 @@ this_dir = os.path.dirname(__file__)
 def save_tags(filename, tags, delete_all=False):
     if filename.endswith('.flac'):
         cmd = [ "metaflac" ]
+        # TODO: --no-utf8-convert?
         if delete_all:
             cmd.append("--remove-all-tags")
         for k, v in tags:
-            cmd.append("--set-tag" + "=" + k.encode('utf-8') + '=' + v.encode('utf-8'))
+            cmd.append(b"--set-tag=%s=%s" % (k.encode('utf-8'), v.encode('utf-8')))
         cmd.append(filename)
     elif filename.endswith('.dts') or filename.endswith('.ac3'):
         cmd = [ "python2", os.path.join(this_dir, "ape.py") ]
         for k, v in tags:
-            cmd.append("--tag" + "=" + k.encode('utf-8') + '=' + v.encode('utf-8'))
+            cmd.append(b"--tag=%s=%s" % (k.encode('utf-8'), v.encode('utf-8')))
         cmd.append(filename)
     #print(cmd)
     subprocess.check_call(cmd)
@@ -38,7 +39,7 @@ def main():
     artists = {}
     versions = {}
     for lineno, line in enumerate(sys.stdin):
-        line = line.decode('utf-8').strip()
+        line = line.strip()
         if not line:
             continue
 
@@ -71,14 +72,14 @@ def main():
         num = i+1
         mytags = []
         if num in titles:
-            mytags.append((u"TITLE", titles[num]))
+            mytags.append(("TITLE", titles[num]))
         if num in versions:
-            mytags.append((u"VERSION", versions[num]))
+            mytags.append(("VERSION", versions[num]))
         if num in artists:
-            mytags.append((u"ARTIST", artists[num]))
+            mytags.append(("ARTIST", artists[num]))
         mytags += list(tags)
-        mytags.append((u"TRACKNUMBER", unicode(num)))
-        mytags.append((u"TRACKTOTAL", unicode(len(filenames))))
+        mytags.append(("TRACKNUMBER", str(num)))
+        mytags.append(("TRACKTOTAL", str(len(filenames))))
         save_tags(filename, mytags, delete_all=opts.delete_all)
 
 if __name__ == '__main__':
