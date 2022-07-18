@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import optparse
+import argparse
 import subprocess
 import sys
 import os
@@ -23,12 +23,15 @@ def save_tags(filename, tags, delete_all=False):
     #print(cmd)
     subprocess.check_call(cmd)
 
-def main():
-    parser = optparse.OptionParser()
-    parser.add_option("-d", dest="delete_all", action="store_true", default=False,
-                      help="delete all tags")
 
-    opts, filenames = parser.parse_args()
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", dest="delete_all", action="store_true", default=False,
+                        help="delete all tags")
+    parser.add_argument("filenames", nargs="*", help="files to tag")
+
+    args = parser.parse_args()
+    filenames = args.filenames
 
     if not filenames:
         print("Usage: qtag <tags files...")
@@ -80,7 +83,7 @@ def main():
         mytags += list(tags)
         mytags.append(("TRACKNUMBER", str(num)))
         mytags.append(("TRACKTOTAL", str(len(filenames))))
-        save_tags(filename, mytags, delete_all=opts.delete_all)
+        save_tags(filename, mytags, delete_all=args.delete_all)
 
 if __name__ == '__main__':
     main()
