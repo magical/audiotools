@@ -63,19 +63,18 @@ def main():
 
     #print(tags)
     #print(titles)
-    
+
     for i, filename in enumerate(filenames):
         num = i+1
-        mytags = list(tags)
-        mytags.append((u"TRACKNUMBER", unicode(num)))
-        mytags.append((u"TRACKTOTAL", unicode(len(filenames))))
+        mytags = []
         if num in titles:
             mytags.append((u"TITLE", titles[num]))
         if num in artists:
             mytags.append((u"ARTIST", artists[num]))
+        mytags += list(tags)
+        mytags.append((u"TRACKNUMBER", unicode(num)))
+        mytags.append((u"TRACKTOTAL", unicode(len(filenames))))
         save_tags(filename, mytags, delete_all=opts.delete_all)
-    
-    sys.exit(0)
 
 if __name__ == '__main__':
     main()
