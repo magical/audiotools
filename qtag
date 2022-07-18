@@ -36,6 +36,7 @@ def main():
     tags = []
     titles = {}
     artists = {}
+    versions = {}
     for lineno, line in enumerate(sys.stdin):
         line = line.decode('utf-8').strip()
         if not line:
@@ -52,11 +53,13 @@ def main():
         if not k:
             print("{}: invalid syntax".format(lineno+1))
             sys.exit(1)
-            
+
         if k.startswith("TITLE") and k[5:].isdigit():
             titles[int(k[5:])] = v
         elif k.startswith("ARTIST") and k[6:].isdigit():
             artists[int(k[6:])] = v
+        elif k.startswith("VERSION") and k[7:].isdigit():
+            versions[int(k[7:])] = v
         else:
             if v:
                 tags.append((k, v))
@@ -69,6 +72,8 @@ def main():
         mytags = []
         if num in titles:
             mytags.append((u"TITLE", titles[num]))
+        if num in versions:
+            mytags.append((u"VERSION", versions[num]))
         if num in artists:
             mytags.append((u"ARTIST", artists[num]))
         mytags += list(tags)
