@@ -32,7 +32,7 @@ def read_flac_tag(filename, tag):
 def read_ape_tag(filename, tag):
     try:
         title = subprocess.check_output([
-            "python2",
+            "python3",
             os.path.join(this_dir, "ape.py"),
             "--get="+tag,
             filename,
