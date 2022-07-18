@@ -23,11 +23,32 @@ def save_tags(filename, tags, delete_all=False):
     #print(cmd)
     subprocess.check_call(cmd)
 
+def get_replaygain_tags(filename):
+    if not filename.endswith('.flac'):
+        raise Exception("only flac files are supported")
+
+    rg_tags = []
+    cmd = [ "metaflac", "--no-utf8-convert", "--export-tags-to=-", filename ]
+    output = subprocess.check_output(cmd)
+    output = output.decode('utf-8')
+    for line in output.splitlines():
+        if line.startswith(("REPLAYGAIN_TRACK_", "REPLAYGAIN_ALBUM_")):
+            k, _, v = line.partition("=")
+            rg_tags.append((k,v))
+    return rg_tags
+
+def Bool(s):
+    if s in ('true', 't', '1'):
+        return True
+    if s in ('false', 'f', '0'):
+        return False
+    raise ValueError(s)
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", dest="delete_all", action="store_true", default=False,
                         help="delete all tags")
+    parser.add_argument("--preserve-replaygain", type=Bool, nargs="?", metavar="BOOL", const=True, default=True, help="with -d, don't remove replaygain tags")
     parser.add_argument("filenames", nargs="*", help="files to tag")
 
     args = parser.parse_args()
@@ -71,6 +92,11 @@ def main():
     #print(tags)
     #print(titles)
 
+    rg_tags = []
+    if args.delete_all and args.preserve_replaygain:
+        for x in filenames:
+            rg_tags.append(get_replaygain_tags(x))
+
     for i, filename in enumerate(filenames):
         num = i+1
         mytags = []
@@ -83,6 +109,8 @@ def main():
         mytags += list(tags)
         mytags.append(("TRACKNUMBER", str(num)))
         mytags.append(("TRACKTOTAL", str(len(filenames))))
+        if rg_tags:
+            mytags += rg_tags[i]
         save_tags(filename, mytags, delete_all=args.delete_all)
 
 if __name__ == '__main__':
