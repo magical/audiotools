@@ -9,12 +9,12 @@
 
 from __future__ import division, print_function, unicode_literals
 
-import musicbrainzngs as mb
+import argparse
 import os
-import re
 import subprocess
 import sys
 
+import musicbrainzngs as mb
 #from pprint import pprint
 
 reload(sys)
@@ -25,31 +25,49 @@ mb.set_useragent('quicktag', '0.1')
 ALLDISCS = u'(All discs)'
 
 def main():
-    if '-h' in sys.argv or '--help' in sys.argv:
-        print("Usage: quicktag \"Artist name\" \"Album title\"")
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument('-h', '--help', action='store_true', help='print help')
+    parser.add_argument('-o', '--output', action='store', help='output file')
+    parser.add_argument('artist', nargs='?', help='artist name')
+    parser.add_argument('album', nargs='?', help='album name')
+    args = parser.parse_args()
+
+    if args.help:
+        print("Usage: mbquery [-o tags.txt] \"Artist name\" \"Album title\"")
         sys.exit(1)
-        
-    if len(sys.argv) < 3:
+
+    if args.album == None:
         cwd = os.getcwd()
         cwd, album = os.path.split(cwd)
     else:
-        album = sys.argv[2]
+        album = args.album
 
-    if len(sys.argv) < 2:
+    if args.artist == None:
         cwd, artist = os.path.split(cwd)
     else:
-        artist = sys.argv[1]
+        artist = args.artist
 
+    if args.output and args.output != "-" and os.path.exists(args.output):
+        print("warning: output file {!r} already exists".format(args.output))
+
+    r, disc = lookup(artist, album)
+
+    if args.output and args.output != "-":
+        file = open(args.output, "wt")
+    else:
+        file = None
+
+    writetags(r, disc, file or sys.stdout)
+
+    if file:
+        file.close()
+
+def lookup(artist, album):
     query = u'artist:"{}" "{}"'.format(artist, album)
     releases = mb.search_releases(query)['release-list']
     r = selecta(releases, format_release)
     if not r:
         sys.exit(0)
-
-    print(u'ALBUM={}'.format(r['title']))
-    print(u'ARTIST={}'.format(r['artist-credit-phrase']))
-
-    various = r['artist-credit-phrase'] == 'Various Artists'
 
     r = mb.get_release_by_id(r['id'], includes=['recordings', 'media', 'release-groups', 'labels', 'artist-credits'])
     r = r['release']
@@ -64,46 +82,58 @@ def main():
     else:
         disc = r['medium-list'][0]
 
+    return r, disc
+
+
+def writetags(r, disc, file):
+    def write(s=""):
+        print(s, file=file)
+
+    write(u'ALBUM={}'.format(r['title']))
+    write(u'ARTIST={}'.format(r['artist-credit-phrase']))
+
+    various = r['artist-credit-phrase'] == 'Various Artists'
+
     release_date = r.get('date', u'')
     original_date = r['release-group']['first-release-date']
 
     if original_date and release_date and original_date != release_date:
-        print(u'DATE={}'.format(original_date))
-        print(u'RELEASEDATE={}'.format(release_date))
+        write(u'DATE={}'.format(original_date))
+        write(u'RELEASEDATE={}'.format(release_date))
     elif original_date:
-        print(u'DATE={}'.format(original_date))
+        write(u'DATE={}'.format(original_date))
     elif release_date:
-        print(u'DATE={}'.format(release_date))
+        write(u'DATE={}'.format(release_date))
     else:
-        print(u'DATE=')
+        write(u'DATE=')
 
     if len(r['medium-list']) > 1:
         if disc is not ALLDISCS:
-            print("DISCNUMBER=", disc['position'], sep="")
-        print("DISCTOTAL=", r['medium-count'], sep="")
+            write(u"DISCNUMBER={}".format(disc['position']))
+        write(u"DISCTOTAL={}".format(r['medium-count']))
 
-    print(u"#CATALOGNUMBER=")
-    print(u'#MUSICBRAINZ_RELEASE_ID={}'.format(r['id']))
-    print(u'#MUSICBRAINZ_RELEASE_GROUP_ID={}'.format(r['release-group']['id']))
-    print()
+    write(u"#CATALOGNUMBER=")
+    write(u'#MUSICBRAINZ_RELEASE_ID={}'.format(r['id']))
+    write(u'#MUSICBRAINZ_RELEASE_GROUP_ID={}'.format(r['release-group']['id']))
+    write()
 
     def print_disc(disc):
         for track in disc['track-list']:
-            print(u"TITLE{}={}".format(track['number'].zfill(2), track['recording']['title']))
+            write(u"TITLE{}={}".format(track['number'].zfill(2), track['recording']['title']))
             if various:
-                print(u"ARTIST{}={}".format(track['number'].zfill(2), track['artist-credit-phrase']))
+                write(u"ARTIST{}={}".format(track['number'].zfill(2), track['artist-credit-phrase']))
 
     if disc is ALLDISCS:
         for disc in r['medium-list']:
             print_disc(disc)
-            print()
+            write()
     else:
         print_disc(disc)
 
-    print()
-    print("# vim: syntax=plain")
-    
-    sys.exit(0)
+    write()
+    write("# vim: syntax=plain")
+
+####
 
 def selecta(choices, formatter):
     if not choices:
