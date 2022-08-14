@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python3
 
 # quicktag 'Artist' 'Album'
 # -> look up album on musicbrainz
@@ -7,8 +7,6 @@
 # -> present for editing
 # -> auto-rename
 
-from __future__ import division, print_function, unicode_literals
-
 import argparse
 import os
 import subprocess
@@ -16,9 +14,6 @@ import sys
 
 import musicbrainzngs as mb
 #from pprint import pprint
-
-reload(sys)
-sys.setdefaultencoding('utf-8')
 
 mb.set_useragent('quicktag', '0.1')
 
@@ -142,14 +137,14 @@ def selecta(choices, formatter):
     lines = []
     for i, x in enumerate(choices):
         lines.append(u"{} {}".format(i+1, formatter(x)).replace(u"\n", u" "))
-    input = "\n".join(lines).encode('utf-8')
+    input = u"\n".join(lines).encode('utf-8')
     try:
         output, _ = proc.communicate(input)
     except KeyboardInterrupt:
         return
     if proc.returncode != 0:
         return
-    num = int(output.split(" ", 1)[0].decode())
+    num = int(output.split(b" ", 1)[0].decode())
     return choices[num - 1]
 
 def format_release(r):
@@ -170,7 +165,7 @@ def format_release(r):
     return s
 
 def format_medium(m):
-    if type(m) is unicode:
+    if type(m) is str:
         return m
     s = "{} tracks".format(m.get('track-count', u'??'))
     if 'format' in m:
