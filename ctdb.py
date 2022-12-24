@@ -7,6 +7,7 @@ import sqlite3
 import zlib
 from collections import namedtuple
 
+import wave
 import mutagen.flac
 import requests
 from xml.etree import ElementTree
@@ -63,11 +64,18 @@ def get_toc(tracks):
     for filename in tracks:
         toc.append(t // 588)
 
-        f = mutagen.flac.Open(filename)
-        if f.info.sample_rate != 44100 or f.info.channels != 2:
-            raise Exception("%s: not a 44100 Hz stereo track" % filename)
+        if filename.endswith(".wav"):
+            f = wave.open(filename, 'rb')
+            if f.getframerate() != 44100 or f.getnchannels() != 2:
+                raise Exception("%s: not a 44100 Hz stereo track" % filename)
+            length = f.getnframes()
+            f.close()
+        else:
+            f = mutagen.flac.Open(filename)
+            if f.info.sample_rate != 44100 or f.info.channels != 2:
+                raise Exception("%s: not a 44100 Hz stereo track" % filename)
 
-        length = f.info.total_samples * 44100 // f.info.sample_rate
+            length = f.info.total_samples * 44100 // f.info.sample_rate
         t += length
     toc.append((t + 588 - 1) // 588)
 
