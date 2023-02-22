@@ -23,7 +23,7 @@ def save_tags(filename, tags, delete_all=False):
     #print(cmd)
     subprocess.check_call(cmd)
 
-def get_preserved_tags(filename):
+def get_replaygain_tags(filename):
     if not filename.endswith('.flac'):
         raise Exception("only flac files are supported")
 
@@ -32,7 +32,7 @@ def get_preserved_tags(filename):
     output = subprocess.check_output(cmd)
     output = output.decode('utf-8')
     for line in output.splitlines():
-        if line.startswith(("REPLAYGAIN_TRACK_", "REPLAYGAIN_ALBUM_", "ENCODER=", 'encoder=')):
+        if line.startswith(("REPLAYGAIN_TRACK_", "REPLAYGAIN_ALBUM_")):
             k, _, v = line.partition("=")
             rg_tags.append((k,v))
     return rg_tags
@@ -95,7 +95,7 @@ def main():
     rg_tags = []
     if args.delete_all and args.preserve_replaygain:
         for x in filenames:
-            rg_tags.append(get_preserved_tags(x))
+            rg_tags.append(get_replaygain_tags(x))
 
     for i, filename in enumerate(filenames):
         num = i+1
