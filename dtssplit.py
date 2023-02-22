@@ -1,4 +1,5 @@
 import sys
+import argparse
 
 """this script splits a dts file into separate tracks based on
 blu-ray chapter markings.
@@ -19,10 +20,17 @@ TICK_HZ = 45000.0 # samples / second
 TICK_START = 27000000 # ticks
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--assume-start", action="store_true", default=True, help="assume the first chapter is the start of the audio")
+    parser.add_argument("--no-assume-start", action="store_false", dest='assume_start', help="don't assume the first chapter is the start of the audio")
+    parser.add_argument("chapters", help="path to list of chapter marks")
+    parser.add_argument("dtsfile", help="path to dts file to split")
+    args = parser.parse_args()
+
     ticklist = []
 
-    chapfile = sys.argv[1]
-    dtsfile = sys.argv[2]
+    chapfile = args.chapters
+    dtsfile = args.dtsfile
 
     info(dtsfile)
 
@@ -31,6 +39,9 @@ def main():
             tick = int(line.strip())
             ticklist.append(tick)
 
+    global TICK_START
+    if args.assume_start:
+        TICK_START = ticklist[0]
     assert ticklist[0] == TICK_START
     del ticklist[0]
 
