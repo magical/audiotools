@@ -1,13 +1,13 @@
 A haphazard collection of scripts for manipulating audio files.
 
 ape.py - add APEv2 tags to a file
-    python2, mutagen
+    python3, mutagen
 edittags - edit flac tags in your text editor
     metaflac, moreutils
 mbquery - look up album metadata on musicbrainz
-    python2, musicbrainzngs, selecta
+    python3, musicbrainzngs, selecta
 qtag - "quick tag" - tag a bunch of files at once
-    python2, metaflac, ape.py
+    python3, metaflac, ape.py
 rename.py - rename files based on tags
     python3, metaflac, ape.py
 renumber.py - add track numbers to files
