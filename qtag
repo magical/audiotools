@@ -39,6 +39,21 @@ def get_replaygain_tags(filename):
             rg_tags.append((k,v))
     return rg_tags
 
+def get_tags(filename, tag_names):
+    if not filename.endswith('.flac'):
+        raise Exception("only flac files support --preserve")
+
+    tag_names = frozenset(tag_names)
+    items = []
+    cmd = [ "metaflac", "--no-utf8-convert", "--export-tags-to=-", filename ]
+    output = subprocess.check_output(cmd)
+    output = output.decode('utf-8')
+    for line in output.splitlines():
+        k, sep, v = line.partition("=")
+        if sep and (k in tag_names):
+            items.append((k,v))
+    return items
+
 def Bool(s):
     if s in ('true', 't', '1'):
         return True
@@ -52,6 +67,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", dest="delete_all", action="store_true", default=False,
                         help="delete all tags")
+    parser.add_argument("-p", "--preserve", dest="preserve", metavar='TAG', action="append",
+                        help="list of tags to preserve with -d (can specify multiple times)")
     parser.add_argument("--preserve-replaygain", type=Bool, nargs="?", metavar="BOOL", const=None, default=None, help="with -d, don't remove replaygain tags")
     parser.add_argument("filenames", nargs="*", help="files to tag")
 
@@ -104,6 +121,11 @@ def main():
             else:
                 rg_tags.append([])
 
+    preserved_tags = {}
+    if args.delete_all and args.preserve:
+        for i, x in enumerate(filenames):
+            preserved_tags[i] = get_tags(x, args.preserve)
+
     for i, filename in enumerate(filenames):
         num = i+1
         mytags = []
@@ -114,6 +136,8 @@ def main():
         if num in artists:
             mytags.append(("ARTIST", artists[num]))
         mytags += list(tags)
+        if preserved_tags and preserved_tags.get(i):
+            mytags += preserved_tags[i]
         mytags.append(("TRACKNUMBER", str(num)))
         mytags.append(("TRACKTOTAL", str(len(filenames))))
         if rg_tags and rg_tags[i]:
