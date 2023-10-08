@@ -26,13 +26,13 @@ def main():
 
     if args.delete_all:
         if f.tags:
-            f.tags.delete()
+            f.tags.delete(args.filename)
         # don't return; let delete_all be combined with import
 
     if not args.tags and not args.import_:
         return
-        
-    if not f.tags:
+
+    if f.tags is None:
         f.add_tags()
 
     if args.import_:
