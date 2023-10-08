@@ -27,7 +27,7 @@ def save_tags(filename, tags, delete_all=False):
 
 def get_replaygain_tags(filename):
     if not filename.endswith('.flac'):
-        raise Exception("only flac files are supported")
+        raise Exception("only flac files support --preserve-replaygain=true")
 
     rg_tags = []
     cmd = [ "metaflac", "--no-utf8-convert", "--export-tags-to=-", filename ]
@@ -44,13 +44,15 @@ def Bool(s):
         return True
     if s in ('false', 'f', '0'):
         return False
+    if s in ('auto',):
+        return None
     raise ValueError(s)
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", dest="delete_all", action="store_true", default=False,
                         help="delete all tags")
-    parser.add_argument("--preserve-replaygain", type=Bool, nargs="?", metavar="BOOL", const=True, default=True, help="with -d, don't remove replaygain tags")
+    parser.add_argument("--preserve-replaygain", type=Bool, nargs="?", metavar="BOOL", const=None, default=None, help="with -d, don't remove replaygain tags")
     parser.add_argument("filenames", nargs="*", help="files to tag")
 
     args = parser.parse_args()
@@ -95,9 +97,12 @@ def main():
     #print(titles)
 
     rg_tags = []
-    if args.delete_all and args.preserve_replaygain:
+    if args.delete_all and args.preserve_replaygain != False:
         for x in filenames:
-            rg_tags.append(get_replaygain_tags(x))
+            if args.preserve_replaygain == True or (args.preserve_replaygain == None and x.endswith(".flac")):
+                rg_tags.append(get_replaygain_tags(x))
+            else:
+                rg_tags.append([])
 
     for i, filename in enumerate(filenames):
         num = i+1
@@ -111,7 +116,7 @@ def main():
         mytags += list(tags)
         mytags.append(("TRACKNUMBER", str(num)))
         mytags.append(("TRACKTOTAL", str(len(filenames))))
-        if rg_tags:
+        if rg_tags and rg_tags[i]:
             mytags += rg_tags[i]
         save_tags(filename, mytags, delete_all=args.delete_all)
 
