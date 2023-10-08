@@ -17,6 +17,8 @@ def save_tags(filename, tags, delete_all=False):
         cmd.append(filename)
     elif filename.endswith('.dts') or filename.endswith('.ac3'):
         cmd = [ "python3", os.path.join(this_dir, "ape.py") ]
+        if delete_all:
+            cmd.append("--delete-all")
         for k, v in tags:
             cmd.append(b"--tag=%s=%s" % (k.encode('utf-8'), v.encode('utf-8')))
         cmd.append(filename)
