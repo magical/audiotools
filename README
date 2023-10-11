@@ -7,7 +7,7 @@ edittags - edit flac tags in your text editor
 mbquery - look up album metadata on musicbrainz
     python3, musicbrainzngs, selecta
 qtag - "quick tag" - tag a bunch of files at once
-    python3, metaflac, ape.py
+    python3, metaflac, opustags, ape.py
 rename.py - rename files based on tags
     python3, metaflac, ape.py
 renumber.py - add track numbers to files

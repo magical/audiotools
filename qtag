@@ -22,6 +22,17 @@ def save_tags(filename, tags, delete_all=False):
         for k, v in tags:
             cmd.append(b"--tag=%s=%s" % (k.encode('utf-8'), v.encode('utf-8')))
         cmd.append(filename)
+    elif filename.endswith('.opus'):
+        # https://github.com/fmang/opustags
+        cmd = [ "opustags" ]
+        if delete_all:
+            cmd.append("--delete-all")
+        for k, v in tags:
+            cmd.append("--add")
+            cmd.append(b"%s=%s" % (k.encode('utf-8'), v.encode('utf-8')))
+        cmd.append("-i")
+        cmd.append(filename)
+
     #print(cmd)
     subprocess.check_call(cmd)
 
@@ -40,18 +51,34 @@ def get_replaygain_tags(filename):
     return rg_tags
 
 def get_tags(filename, tag_names):
-    if not filename.endswith('.flac'):
-        raise Exception("only flac files support --preserve")
-
     tag_names = frozenset(tag_names)
     items = []
-    cmd = [ "metaflac", "--no-utf8-convert", "--export-tags-to=-", filename ]
-    output = subprocess.check_output(cmd)
-    output = output.decode('utf-8')
-    for line in output.splitlines():
-        k, sep, v = line.partition("=")
-        if sep and (k in tag_names):
-            items.append((k,v))
+    if filename.endswith(".flac"):
+        cmd = [ "metaflac", "--no-utf8-convert", "--export-tags-to=-", filename ]
+        output = subprocess.check_output(cmd)
+        output = output.decode('utf-8')
+        for line in output.splitlines():
+            k, sep, v = line.partition("=")
+            if sep and (k in tag_names):
+                items.append((k,v))
+    elif filename.endswith(".opus"):
+        cmd = [ "opustags", filename ]
+        output = subprocess.check_output(cmd)
+        output = output.decode('utf-8')
+        cont = False
+        for line in output.splitlines():
+            if cont and line.startswith('\t'):
+                k, v = items[-1]
+                items[-1] = (k, v+'\n'+line[1:])
+            else:
+                cont = False
+                k, sep, v = line.partition("=")
+                if sep and (k in tag_names):
+                    items.append((k,v))
+                    cont = True
+    else:
+        raise Exception("only flac and opus files support --preserve")
+
     return items
 
 def Bool(s):
