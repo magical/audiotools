@@ -90,6 +90,7 @@ def clean(s, noparens=True):
     s = s.replace(":", ".") # 6:00 => 6.00
     s = s.replace("/", "-")
     s = s.replace("?", "")
+    s = s.replace("*", "")
     s = s.replace("‘", "'").replace("’", "'") # Curly quotes are evil
     s = s.replace("“", "").replace("”", "").replace('"', "")
     s = s.replace("\u2014", " - ")
