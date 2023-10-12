@@ -138,7 +138,7 @@ def main():
 
         newname = clean(title, noparens=not args.parens) + ext
         if args.artists and artist:
-            newname = "{} - {}".format(artist, newname)
+            newname = "{} - {}".format(clean(artist, noparens=False), newname)
         if number is not None:
             newname = "{:02d} {}".format(number, newname)
             if args.disc and discnumber and disctotal != 1:
