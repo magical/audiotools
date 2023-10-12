@@ -118,25 +118,27 @@ def main():
     renames = []
     for row, filename in enumerate(args.filenames):
         title = read_title(filename)
-        number = read_number(filename, 'TRACKNUMBER')
-        discnumber = read_number(filename, 'DISCNUMBER')
-        disctotal = read_number(filename, 'DISCTOTOL')
-        if args.artists:
-            artist = read_tag(filename, "ARTIST")
-        else:
-            artist = None
-
         if not title:
             print("No title, skipping: {!r}".format(filename))
             continue
+
+        number = read_number(filename, 'TRACKNUMBER')
+        discnumber = None
+        disctotal = None
+        artist = None
+        if args.disc:
+            discnumber = read_number(filename, 'DISCNUMBER')
+            disctotal = read_number(filename, 'DISCTOTOL')
+        if args.artists:
+            artist = read_tag(filename, "ARTIST")
 
         dirname, basename = os.path.split(filename)
         _, ext = os.path.splitext(basename)
 
         newname = clean(title, noparens=not args.parens) + ext
+        if args.artists and artist:
+            newname = "{} - {}".format(artist, newname)
         if number is not None:
-            if artist:
-                newname = "{} - {}".format(artist, newname)
             newname = "{:02d} {}".format(number, newname)
             if args.disc and discnumber and disctotal != 1:
                 newname = "{:d}-{}".format(discnumber, newname)
