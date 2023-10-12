@@ -25,9 +25,18 @@ def main():
             print(f.tags.get(tag, ''))
 
     if args.delete_all:
-        if f.tags:
-            f.tags.delete(args.filename)
-        # don't return; let delete_all be combined with import
+        if args.tags or args.import_:
+            # we're going to add tags later, so just clear the tags dict for now
+            # (if there are no tags yet, do nothing)
+            if f.tags is not None:
+                f.tags.clear()
+            # fallthrough...
+        else:
+            # we're only deleting, so call f.delete() and quit.
+            # this will remove the entire APEv2 chunk
+            # it does nothing if f.tags is not set
+            f.delete()
+            return
 
     if not args.tags and not args.import_:
         return
