@@ -44,9 +44,35 @@ def read_ape_tag(filename, tag):
     title = title.strip("\n\t ")
     return title
 
+_opus_cache = {}
+def read_opus_tag(filename, tag):
+    if filename in _opus_cache:
+        return _opus_cache[filename].get(tag, "")
+
+    try:
+        output = subprocess.check_output([ "opustags", filename ])
+        output = output.decode('utf-8')
+    except subprocess.CalledProcessError as e:
+        _opus_cache[filename] = {}
+        return ""
+    tags = {}
+    last_key = ""
+    for line in output.splitlines():
+        if last_key and line.startswith("\t"):
+            tags[last_key] += "\n" + line[1:]
+        else:
+            k, _, v = line.partition('=')
+            tags[k] = v
+            last_key = k
+    #print(tags)
+    _opus_cache[filename] = tags
+    return tags.get(tag, "")
+
 def read_tag(filename, tag):
     if filename.endswith(".dts") or filename.endswith(".ac3"):
         return read_ape_tag(filename, tag)
+    if filename.endswith(".opus"):
+        return read_opus_tag(filename, tag)
     return read_flac_tag(filename, tag)
 
 def read_title(filename):
@@ -97,7 +123,7 @@ def main():
         if not title:
             print("No title, skipping: {!r}".format(filename))
             continue
-            
+
         dirname, basename = os.path.split(filename)
         _, ext = os.path.splitext(basename)
 
