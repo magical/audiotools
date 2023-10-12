@@ -153,6 +153,8 @@ def main():
         for i, x in enumerate(filenames):
             preserved_tags[i] = get_tags(x, args.preserve)
 
+    # TODO: preserve opus cover images (METADATA_BLOCK_PICTURE)
+
     for i, filename in enumerate(filenames):
         num = i+1
         mytags = []
