@@ -107,6 +107,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--disc', action='store_true', help="prepend disc number")
     parser.add_argument('-p', '--keep-parens', dest='parens', action='store_true', help="don't strip parentheticals")
+    parser.add_argument('-a', '--artists', action='store_true', help="include artist names")
     parser.add_argument('filenames', nargs='+')
     args = parser.parse_args()
 
@@ -120,6 +121,11 @@ def main():
         number = read_number(filename, 'TRACKNUMBER')
         discnumber = read_number(filename, 'DISCNUMBER')
         disctotal = read_number(filename, 'DISCTOTOL')
+        if args.artists:
+            artist = read_tag(filename, "ARTIST")
+        else:
+            artist = None
+
         if not title:
             print("No title, skipping: {!r}".format(filename))
             continue
@@ -129,6 +135,8 @@ def main():
 
         newname = clean(title, noparens=not args.parens) + ext
         if number is not None:
+            if artist:
+                newname = "{} - {}".format(artist, newname)
             newname = "{:02d} {}".format(number, newname)
             if args.disc and discnumber and disctotal != 1:
                 newname = "{:d}-{}".format(discnumber, newname)
