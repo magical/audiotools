@@ -155,9 +155,7 @@ def main():
     if not renames:
         return
 
-    print("Rename these files? ", end="")
-    sys.stdout.flush()
-    response = sys.stdin.readline()
+    response = input("Rename these files? ")
     if response.strip().lower() not in ('y', 'yes'):
         print("OK, nevermind")
         return
