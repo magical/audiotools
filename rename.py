@@ -106,7 +106,7 @@ def clean(s, noparens=True):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--disc', action='store_true', help="prepend disc number")
-    parser.add_argument('-p', '--keep-parens', dest='parens', action='store_true', help="don't strip parenteticals")
+    parser.add_argument('-p', '--keep-parens', dest='parens', action='store_true', help="don't strip parentheticals")
     parser.add_argument('filenames', nargs='+')
     args = parser.parse_args()
 
